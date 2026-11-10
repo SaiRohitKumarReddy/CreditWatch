@@ -348,22 +348,19 @@ The CreditWatch login interface should appear in your browser.
 
 ---
 
-## 9. Optional Groq AI Configuration
+## 9. Groq AI Integration
 
-To enable AI-assisted interpretation, configure the Groq API key privately.
+CreditWatch integrates the **Groq API** to power two AI intelligence capabilities: the **AI Risk Investigation Engine** and **AI Portfolio Intelligence**.
 
-For example, add the following section to `.streamlit/secrets.toml`:
+The AI Risk Investigation Engine examines relationships across borrower-specific Early Warning Signals and financial evidence. It produces structured interpretations of current credit risk, connected warning indicators, potential consequences of continued deterioration, evidence gaps, and recommended monitoring actions.
 
-```toml
-[groq]
-api_key = "YOUR_GROQ_API_KEY"
-```
+AI Portfolio Intelligence provides VP/CRO users with a natural-language interface for analysing portfolio exposure, risk classifications, borrower monitoring status, and Early Warning Signals.
 
-The application uses Groq for interpretation of borrower and portfolio evidence.
+Both capabilities operate on financial information, ratios, EWS results, and portfolio aggregates calculated by the Python backend. The LLM is responsible for interpretation, not financial computation.
 
-All financial figures and EWS results remain governed by Python-based calculations.
+CreditWatch uses Groq's `openai/gpt-oss-20b` model for these intelligence features.
 
-AI-generated observations should be reviewed by qualified credit professionals before use in credit decisions.
+A valid Groq API key must be configured securely in the deployment environment to execute live AI requests. The API key is never included in the public GitHub repository.
 
 ---
 
