@@ -1,0 +1,6 @@
+# Identical CreditLens financial definitions; see credit_platform/finance.py
+streamlit>=1.53,<2
+fastapi>=0.110,<1
+uvicorn>=0.29,<1
+gspread>=6.2,<7
+google-auth>=2.30,<3

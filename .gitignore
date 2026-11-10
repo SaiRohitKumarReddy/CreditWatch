@@ -1,0 +1,11 @@
+.local_data/
+.streamlit/secrets.toml
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.venv/
+.idea/
+.DS_Store
+.streamlit/secrets.toml
+.streamlit/*.json
