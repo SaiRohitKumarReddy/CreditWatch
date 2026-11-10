@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="color-scheme" content="light"/><title>CreditWatch — Corporate & MSME Credit Monitoring</title><link rel="stylesheet" href="/static/app.css"/></head><body><div id="creditwatch-root"><div class="boot-splash">Launching synthetic monitoring workspace…</div></div><script type="module">
+import mount from '/static/app.js';
+const root=document.getElementById('creditwatch-root');
+let current={},busy=false;
+const bridge={parentElement:root,data:null,setTriggerValue:(key,payload)=>{if(key==='action')runAction(payload)}};
+async function reload(){try{const rsp=await fetch('/api/state',{credentials:'same-origin'});const body=await rsp.json();if(!rsp.ok)throw Error(body.detail||'Unable to load data');bridge.data=body;mount(bridge);}catch(e){root.innerHTML='<div class="fatal">Unable to load demo: '+String(e).replaceAll('<','&lt;')+'</div>';}}
+async function runAction(action){if(busy)return;busy=true;try{const rsp=await fetch('/api/action',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)});const res=await rsp.json();if(!rsp.ok){bridge.data.notice={type:'error',text:res.detail||'Action could not be completed'};mount(bridge);return;}await reload();}catch(e){bridge.data.notice={type:'error',text:'Connection error: '+String(e)};mount(bridge);}finally{busy=false;}}
+reload();
+</script></body></html>
