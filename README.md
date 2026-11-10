@@ -1,133 +1,506 @@
-# CreditWatch — Corporate & MSME Credit Monitoring
 
-**Standalone HTML + Python app | 10 early warning signals | Realistic, 100% synthetic borrower portfolio**
+# CreditWatch — Credit Monitoring & Early Warning System
 
-CreditWatch monitors **existing, previously approved borrowers only**, after sanction. There is **no borrower registration flow or onboarding endpoint**. It was designed as an independent companion to CreditLens, with integration deliberately deferred.
+**A Python-based Credit Risk Monitoring and Early Warning System for Corporate and MSME Lending**
 
-## What is included
+CreditWatch is a post-sanction credit monitoring application built using **Python, Streamlit, HTML, CSS, JavaScript, Google Sheets, and Generative AI**.
 
-- 30 completely fictitious, pre-approved corporate/MSME borrowers across manufacturing, trading, services, healthcare, agriculture and logistics.
-- 3 years of original/sanction-reference historical financials (FY2023–FY2025), newer FY2026 monitoring statements for 27 borrowers, some sanction-approved projections, and support for additional monitoring years.
-- Exact unchanged copies of **CreditLens `credit_platform/finance.py` and `credit_platform/constants.py`** — same fields, `compute_ratios()`, and `validate_financials()`. Calculation parity is verified by an included SHA-256/test.
-- 4,680 synthetic **facility-level** daily outstanding entries; 2,686 synthetic account-credit observations; dated repayments, contractual covenants, internal credit rating histories and facility details.
-- 10 deterministic EWS: CW-01, 02, 04, 07, 11, 13, 14, 16, 20, 24. Each exposes level, value, comparison period, evidence source and missing-data handling.
-- Separate monitoring-report and ongoing signal/case states; individual investigation cases can remain open until reviewed.
-- AVP edits of monitoring statements; VP/CRO edits of **original sanction baseline** with before/after audit history and recalculation.
-- Analyst → AVP → VP/CRO review and approval; finalized reports preserve their reviewed financial and EWS snapshots.
-- Dedicated CRO monitoring command centre with approval queue, heatmap, signal-breach counts, at-risk funded exposure, risk distribution and borrower-level drill-down.
-- An **Ask CreditWatch AI** panel that defaults to accurate local evidence analysis, understands misspellings and can optionally use Groq after configuring a private key and obtaining explicit per-question consent.
-- An interactive **synthetic stress-event lab**, where officers can apply a fake missed payment, rating downgrade, high utilisation or falling operating receipts and see the EWS results change.
+The application is designed to demonstrate how financial institutions can monitor existing borrowers, assess changes in financial performance, identify early warning signals, investigate emerging risks, and manage monitoring reports through a role-based review and approval process.
 
-## V1.1 styling correction (21 October 2026)
+CreditWatch uses synthetic borrower data and is intended for demonstration, learning, and application development purposes.
 
-This release fixes a Streamlit Components V2 styling issue: JavaScript previously replaced the component's shadow-root contents, deleting the registered stylesheet. Screen updates now target only the dedicated `#creditwatch-html-root` element, preserving Streamlit's CSS and shadow-root variables. This correction does not change the EWS financial logic or borrower records.
+---
 
-For an existing installation, only `frontend/app.js` and `frontend/app.css` need replacement. Stop the running Streamlit process and restart it after copying those files; the component assets are cached for the process lifetime. Your `.local_data/creditwatch_demo.json` is unaffected.
+## 1. Project Overview
 
-## Quick start — Streamlit (same HTML hosting approach as CreditLens)
+In commercial lending, approving a loan is only the beginning of the credit relationship.
 
-From the extracted `CreditWatch_HTML` directory:
+Once a loan has been sanctioned, financial institutions must continue monitoring the borrower's financial performance, repayment behaviour, facility utilisation, contractual covenants, and overall creditworthiness.
 
-```powershell
-python -m pip install -r requirements.txt
-python -m streamlit run app.py
-```
+A borrower who appeared financially healthy at the time of sanction may subsequently experience declining revenue, cash flow pressure, increasing receivables, repayment delays, or deterioration in debt-servicing capacity.
 
-The app opens in the browser at the URL printed by Streamlit (usually `http://localhost:8501`). It uses **Streamlit 1.53+ Components V2** to render the custom HTML/CSS/JavaScript frontend, with all actual computations and mutations on the Python side.
+CreditWatch addresses this monitoring requirement through a centralized application that combines financial analysis, rule-based Early Warning Signals (EWS), investigation workflows, and AI-assisted risk interpretation.
 
-## Optional — standalone FastAPI host
+The system focuses on **existing, previously approved borrowers** rather than new loan origination.
 
-The same front-end and Python service can also run without Streamlit:
+---
 
-```powershell
-python -m pip install -r requirements.txt
-python -m uvicorn server:app --port 8501
-```
+## 2. Key Features
 
-Open `http://localhost:8501`. This is useful for conventional web integration tests or a lightweight local prototype.
+### Borrower Monitoring
 
-## Login and roles (demo only)
+- Monitor existing Corporate and MSME borrowers.
+- Review original sanction-period financial statements.
+- Add and evaluate post-sanction monitoring financials.
+- Compare financial performance across reporting periods.
+- Examine outstanding credit facilities, utilisation, and repayment information.
+- Track borrower monitoring status and report preparation.
 
-At startup, choose one of:
+### Financial Analysis
 
-| Role | Rights |
-| --- | --- |
-| **Monitoring Analyst** | View existing borrowers and statements; prepare new-period financial entries; amend own drafts/returned reports; submit monitoring reports; investigate cases. |
-| **Monitoring AVP** | Analyst access plus direct corrections of monitoring financials (with audit), AVP report approval/return, and authorized case closure. **No baseline financial editing.** |
-| **VP/CRO** | Unrestricted application functions, including **original baseline financial corrections**, all new-period edits, approvals, direct interventions, portfolio monitoring and finalization. |
+CreditWatch evaluates borrower financial performance using Python-based financial calculations.
 
-**This is a deliberately open demonstration role selector, not employee identity verification.** Keep the demo on controlled/local systems. Do not deploy this build with real customer data or pretend the roles are authenticated. Production deployment requires proper login, role grants, data protection and a transactional audited repository.
+Key areas include:
 
-## Data storage
+- Revenue and profitability movement
+- EBITDA and EBITDA margin
+- Operating cash flow
+- Debt Service Coverage Ratio (DSCR)
+- Liquidity and leverage
+- Receivable, inventory, and payable days
+- Working capital cycle
+- Actual performance against available projections
 
-On the first run, the Python backend creates `.local_data/creditwatch_demo.json` using deterministic pseudorandom seed values. All company names, industries, ratios, payments, defaults and events are invented. The figures reflect plausible relative scales; **they are not real borrower accounts, observed defaults, verified risk thresholds or audited statements**.
+Financial calculations follow the shared methodology used in the companion CreditLens project.
 
-To reset the demonstration, stop the server and remove `.local_data/creditwatch_demo.json`. It regenerates on next launch. Do not commit the generated data or include real bank credentials in the project.
+### Early Warning System (EWS)
 
-The `CREDITWATCH_DATA_FILE` environment variable can override the local JSON path for tests or separate demo environments. JSON is intended for a **single-process prototype only**, not shared concurrent production workloads.
+CreditWatch includes **10 rule-based Early Warning Signals**.
 
-## Standardization with CreditLens
+| Signal | Description |
+|---|---|
+| CW-01 | Persistent Facility Utilisation |
+| CW-02 | Utilisation Deterioration |
+| CW-04 | Declining Account Credits |
+| CW-07 | Payment Overdue |
+| CW-11 | Revenue Deterioration |
+| CW-13 | Operating Cash Flow Deterioration |
+| CW-14 | DSCR Deterioration |
+| CW-16 | Increasing Receivable Days |
+| CW-20 | Covenant Breach |
+| CW-24 | Credit Rating Migration |
 
-The following two files were copied byte-for-byte from the uploaded `CreditLens_HTML-main.zip`:
+Each signal is evaluated using Python-defined rules and available borrower evidence.
 
-```text
-CreditWatch_HTML/credit_platform/finance.py
-CreditWatch_HTML/credit_platform/constants.py
-```
+The application distinguishes between triggered signals, severity levels, missing information, and unresolved investigations.
 
-Financial calculations are *not* reimplemented in the EWS or report modules. CW-11, CW-13, CW-14 and CW-16 call `compute_ratios()` directly. Reports use the same metric values. Both apps therefore use identical definitions of CFADS/interest-plus-principal DSCR, year-end receivables/revenue-based DSO, inventory/COGS DIO, payable/COGS DPO and CCC.
+**Note:** The thresholds are illustrative credit monitoring rules and should not be interpreted as RBI-prescribed regulatory classifications.
 
-**Financial-methodology qualification:** CreditLens's DSO and working-capital days are simplified closing-balance approximations. They are visibly identified as **proxies** in CreditWatch and are not substituted with average-balance formulas without a future *joint* versioned calculation change in both apps.
+### Investigation Workflow
 
-CreditWatch's post-sanction narratives compare FY2025 sanction-reference actuals with available monitoring actuals, and show sanctioned projections separately when seeded. A monitoring year can contain some months before formal sanction, a limitation the narrative notes. Such year-level comparisons are not a post-disbursement transaction-level attribution.
+CreditWatch allows monitoring officers to investigate individual early warning signals.
 
-## Critical policy notes
+Features include:
 
-- EWS thresholds are **illustrative configurable screening policy candidates**, not RBI-mandated limits or calibrated risk thresholds. A generic EWS severity is not SMA/NPA classification, an internal credit grade, or a default probability.
-- Facility utilisation indicators apply only to CC/OD, not term loans. CW-01 requires at least 27 of 30 days and CW-02 at least 27 observations in both 30-day windows. Account-credit declines use eligible business-credit totals, excluding simulated non-operating transactions.
-- CW-07 overdue duration measures currently unpaid contractual obligations, not the full set of regulatory asset classification criteria. CW-20 evaluates documented synthetic numerical covenants and treats waivers as needing follow-up rather than an automatic confirmed breach.
-- Missing, stale and non-applicable inputs are distinct from 'Clear'. CRO dashboards count **distinct borrowers** for affected-exposure measures rather than summing exposures per triggered signal.
-- Financials are not silently modified by AI: the evidence assistant only reads verified Python calculations. Generative LLM access is optional and **not shipped with an API key**. Local mode is explicitly labeled deterministic; optional Groq calls require a private key and explicit per-question consent and are rejected if they introduce unsupported numerical claims.
-- VP/CRO baseline edits are versioned and visible in the audit history. Already finalized monitoring report snapshots remain historical evidence.
+- Borrower-specific investigation cases
+- Signal severity and investigation status
+- Investigation findings and supporting observations
+- Saved investigation history
+- Officer and timestamp information
+- Follow-up observations without overwriting earlier findings
 
-## Project tree
+Previously saved investigation findings remain accessible when a case is reopened.
+
+### Monitoring Reports & Approvals
+
+The application supports a structured credit monitoring workflow.
+
+**Analyst → AVP → VP/CRO**
+
+- Analysts prepare monitoring financials and reports.
+- AVPs review submissions and make authorized corrections.
+- VP/CRO users review, return, approve, and finalize monitoring reports.
+- Review history and finalized report snapshots are retained.
+- Changes are recorded through application audit mechanisms.
+
+### VP/CRO Command Centre
+
+A dedicated executive monitoring dashboard provides visibility into:
+
+- Borrower monitoring status
+- Pending review and approval queues
+- Triggered Early Warning Signals
+- Borrower risk classifications
+- Outstanding credit exposure
+- Open investigations
+- Portfolio-level monitoring trends
+- Borrower-level financial and EWS details
+
+---
+
+## 3. AI-Powered Risk Intelligence
+
+CreditWatch includes two AI-assisted capabilities using the Groq API.
+
+### AI Risk Investigation Engine
+
+The AI Risk Investigation Engine interprets relationships between multiple Early Warning Signals affecting a borrower.
+
+It helps explain:
+
+- The borrower's current financial and credit risk situation
+- How different warning signals may be connected
+- Potential consequences if deterioration continues
+- Alternative explanations and evidence gaps
+- Recommended monitoring and investigation actions
+
+The AI receives financial calculations, ratios, signal results, and other evidence already prepared by Python.
+
+**The LLM does not independently calculate or change financial ratios, DSCR, facility exposure, or EWS severity.**
+
+### AI Portfolio Intelligence
+
+Available to VP/CRO users, this feature supports natural-language questions about the monitored portfolio.
+
+It assists with interpreting portfolio-level information, including exposure, monitoring status, risk concentrations, and Early Warning Signals.
+
+AI responses are intended as decision-support commentary rather than automated credit decisions.
+
+Generative AI functionality requires a separately configured Groq API key.
+
+---
+
+## 4. User Roles & Permissions
+
+| Role | Responsibilities |
+|---|---|
+| Monitoring Analyst | Borrower monitoring, financial preparation, EWS investigation and report submission |
+| Monitoring AVP | Analyst functions, financial corrections, report review, approval or return, and authorized investigation actions |
+| VP/CRO | Portfolio Command Centre, borrower monitoring activation and assignment, full monitoring oversight, final approvals and authorized baseline modifications |
+
+VP/CRO users control the activation of existing borrowers into the monitoring workflow.
+
+The application includes role-based demonstration access. It is not a production identity and access management system.
+
+---
+
+## 5. Technology Stack
+
+| Component | Technology |
+|---|---|
+| Application Backend | Python |
+| Application Hosting | Streamlit |
+| Frontend | HTML, CSS, JavaScript |
+| API Framework | FastAPI (optional) |
+| Database | Google Sheets |
+| Local Backup Storage | JSON |
+| AI Integration | Groq API |
+| Financial Analysis | Python-based calculations |
+| Version Control | GitHub |
+
+The custom frontend is integrated with Streamlit, while financial calculations, monitoring logic, database operations, and approval rules are handled by the Python backend.
+
+---
+
+## 6. Database Architecture
+
+CreditWatch originally used a local JSON database.
+
+The application has been updated to support **Google Sheets as its primary persistent storage backend**, with the existing JSON implementation retained for local development and rollback.
+
+The Google Sheets database contains 18 data sections:
+
+1. `metadata`
+2. `borrowers`
+3. `baseline_financials`
+4. `monitor_financials`
+5. `facilities`
+6. `balances`
+7. `account_credits`
+8. `repayments`
+9. `covenants`
+10. `ratings`
+11. `reports`
+12. `cases`
+13. `audit`
+14. `signal_events`
+15. `projections`
+16. `baseline_versions`
+17. `borrower_assignments`
+18. `monitoring_activations`
+
+The initial migration transferred and verified **8,125 records across all 18 sections**.
+
+The database supports borrower financial history, monitoring activity, approval workflows, investigation records, and audit information.
+
+Structured and nested data is preserved during storage and retrieval.
+
+### Google Sheets Integration
+
+CreditWatch uses a Google Cloud service account and the Google Sheets API to read and write data.
+
+When Google Sheets storage is enabled:
+
+- Application changes are written to Google Sheets.
+- Existing borrower information can be retrieved from the shared database.
+- Monitoring updates and investigation notes persist across application restarts.
+- Local JSON storage remains available as a separate backup option.
+
+The Google Sheets adapter is designed for this demonstration application. Production lending systems would require stronger concurrency management, authentication, audit controls, and transactional database guarantees.
+
+---
+
+## 7. Project Structure
 
 ```text
 CreditWatch_HTML/
-├── app.py                # Streamlit Components V2 host
-├── server.py             # Optional FastAPI demo host
-├── frontend/
-│   ├── index.html
-│   ├── app.css
-│   └── app.js
-├── credit_platform/
-│   ├── finance.py        # UNCHANGED from CreditLens
-│   └── constants.py      # UNCHANGED from CreditLens
-├── creditwatch/
-│   ├── seed.py            # Synthetic existing approved borrowers + source evidence
-│   ├── ews.py             # Ten evidence-based EWS rules
-│   ├── commentary.py      # Post-sanction narrative + local query answers
-│   ├── service.py         # Role checks, approval, cases and dashboard payloads
-│   └── repository.py      # Atomic single-process JSON demo repository
-├── tests/
-├── requirements.txt
-└── .streamlit/config.toml
+|
+|-- app.py
+|-- server.py
+|-- requirements.txt
+|-- README.md
+|-- .gitignore
+|
+|-- frontend/
+|   |-- index.html
+|   |-- app.css
+|   |-- app.js
+|
+|-- credit_platform/
+|   |-- finance.py
+|   |-- constants.py
+|
+|-- creditwatch/
+|   |-- repository.py
+|   |-- sheets_repository.py
+|   |-- storage.py
+|   |-- service.py
+|   |-- seed.py
+|   |-- ews.py
+|   |-- commentary.py
+|   |-- ai.py
+|   |-- ai_intelligence.py
+|   |-- ...
+|
+|-- docs/
+|-- tests/
 ```
 
-## Testing
+The `creditwatch` package contains application logic, financial monitoring functions, EWS evaluations, report workflows, AI integrations, and storage implementations.
+
+Private credential files, generated JSON databases, and local backups are intentionally excluded from the public repository.
+
+---
+
+## 8. Installation & Local Setup
+
+### Prerequisites
+
+- Python 3.11 or later
+- Internet access for Google Sheets integration
+- Google Cloud service account with Google Sheets access
+- Groq API key for optional Generative AI features
+
+### Step 1 — Download the Repository
+
+Download the repository ZIP from GitHub and extract it to your preferred location.
+
+Open a terminal inside the extracted project directory.
+
+### Step 2 — Install Dependencies
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### Step 3 — Configure Google Sheets
+
+Create a `.streamlit` folder inside the project directory if it does not exist.
+
+Store the service account JSON credential file privately as:
+
+```text
+.streamlit/creditwatch_service_account.json
+```
+
+Create a private `.streamlit/secrets.toml` file containing:
+
+```toml
+[creditwatch_sheets]
+spreadsheet_id = "YOUR_GOOGLE_SPREADSHEET_ID"
+```
+
+The Google spreadsheet must be shared with the service account email address with appropriate editing permissions.
+
+**Never commit service account credentials or API keys to GitHub.**
+
+### Step 4 — Select the Database Backend
+
+To use Google Sheets in Windows PowerShell:
 
 ```powershell
+$env:CREDITWATCH_STORAGE = "sheets"
+```
+
+To use local JSON storage instead:
+
+```powershell
+$env:CREDITWATCH_STORAGE = "json"
+```
+
+If the environment variable is not configured, the application defaults to JSON storage.
+
+For Google Sheets mode, the target spreadsheet must already contain the required worksheets and data. An empty spreadsheet is not automatically initialized by this setting.
+
+### Step 5 — Start the Application
+
+```bash
+python -m streamlit run app.py
+```
+
+Open the local URL displayed in the terminal, normally:
+
+```text
+http://localhost:8501
+```
+
+The CreditWatch login interface should appear in your browser.
+
+---
+
+## 9. Optional Groq AI Configuration
+
+To enable AI-assisted interpretation, configure the Groq API key privately.
+
+For example, add the following section to `.streamlit/secrets.toml`:
+
+```toml
+[groq]
+api_key = "YOUR_GROQ_API_KEY"
+```
+
+The application uses Groq for interpretation of borrower and portfolio evidence.
+
+All financial figures and EWS results remain governed by Python-based calculations.
+
+AI-generated observations should be reviewed by qualified credit professionals before use in credit decisions.
+
+---
+
+## 10. Running with FastAPI
+
+CreditWatch also includes an optional FastAPI host.
+
+To run the application using FastAPI:
+
+```bash
+python -m uvicorn server:app --port 8501
+```
+
+Open:
+
+```text
+http://localhost:8501
+```
+
+Streamlit remains the primary demonstration hosting option.
+
+---
+
+## 11. Synthetic Demonstration Dataset
+
+CreditWatch includes a synthetic Corporate and MSME borrower portfolio.
+
+The original demonstration dataset contains:
+
+| Data Category | Records |
+|---|---:|
+| Borrowers | 30 |
+| Baseline Financials | 90 |
+| Monitoring Financials | 27 |
+| Facilities | 57 |
+| Facility Balances | 4,680 |
+| Account Credit Records | 2,686 |
+| Repayments | 156 |
+| Monitoring Reports | 27 |
+| Investigation Cases | 111 |
+| Signal Events | 111 |
+
+The initial Google Sheets migration contained **8,125 records in total**, including additional metadata, ratings, covenants, projections, assignments, and audit information.
+
+These counts describe the initial dataset and may change as users interact with the application.
+
+All borrower identities, financial statements, repayments, monitoring outcomes, and credit events are synthetic.
+
+---
+
+## 12. Financial Calculation Principles
+
+CreditWatch uses Python to calculate financial metrics and evaluate Early Warning Signals.
+
+The AI layer is not permitted to replace these calculations with independently generated figures.
+
+Key design principles include:
+
+- Consistent financial calculations across the application
+- Evidence-based EWS triggering
+- Separation of monitoring actuals and sanction-reference financials
+- Distinction between missing data and genuine warning signals
+- Preservation of original financial information and authorized amendment history
+- Retention of historical monitoring report snapshots
+- Separation of deterministic risk calculations and AI interpretation
+
+Certain financial indicators, including working capital days, use simplified closing-balance approximations suitable for the synthetic demonstration dataset.
+
+---
+
+## 13. Testing & Validation
+
+The project includes Python tests covering aspects of financial calculations, EWS logic, borrower monitoring, permissions, and approval workflows.
+
+Run tests using:
+
+```bash
 python -m pytest -q
 ```
 
-The included tests cover financial parity, valid synthetic balances, EWS scenarios, rights for each role, AVP/CRO workflow, immutable baseline version history, and snapshot retention.
+The Google Sheets migration was also validated through:
 
-## Future CreditLens integration
+- Comparison of original JSON records against Google Sheets records
+- Read, write, and delete operations
+- Application-level investigation updates
+- Persistence verification after application restart
+- Retrieval and display of previously saved investigation findings
 
-Borrowers and facilities already use stable IDs, and CreditWatch keeps baseline, monitoring and audit data separate. A later sync layer should import **approved CreditLens borrowers**, source financial periods, facilities and outstanding data read-only. CreditWatch VP/CRO baseline amendments should never automatically overwrite CreditLens source entries. Resolve borrower-ID mapping and duplicate prevention explicitly before connecting real applications.
+These checks validate the implemented demonstration workflows and do not constitute production-system or regulatory validation.
 
-## Optional Groq AI assistant
+---
 
-The local evidence assistant requires **no API key**. To enable optional generative interpretation of synthetic borrower evidence, set environment variables `GROQ_API_KEY` and, if needed, `GROQ_MODEL`. Under Streamlit, you may instead create a **private, gitignored** `.streamlit/secrets.toml` containing `[groq]` and `api_key = "..."`. Do **not** copy credentials into GitHub.
+## 14. Relationship with CreditLens
 
-The user must select **Use Groq AI** and explicitly consent for that question. The model only receives structured, synthetic evidence. The Python guard rejects numeric claims not already present in the verified material; if the request fails or output is rejected, the deterministic assistant responds instead. This conservative screening is not equivalent to a full regulated-model validation or human review.
+CreditWatch has been developed as a standalone companion application to CreditLens.
+
+**CreditLens** focuses on borrower credit assessment, financial analysis, lending appraisal, and approval.
+
+**CreditWatch** focuses on monitoring borrowers after sanction, identifying deterioration, investigating warning signals, and reviewing ongoing credit exposure.
+
+Future integration may allow approved CreditLens borrowers to be transferred into CreditWatch for post-sanction monitoring.
+
+The applications are currently separate, and the proposed integration is not yet implemented.
+
+---
+
+## 15. Deployment & Security Notes
+
+This repository contains application source code only.
+
+For deployment, configure Google Sheets and AI credentials securely in the hosting environment.
+
+Do not upload:
+
+- Google service account private keys
+- Groq API keys
+- `.streamlit/secrets.toml`
+- Local JSON database files
+- Backup folders
+- Python cache files
+
+Local Windows environment variables are not automatically transferred to cloud hosting environments.
+
+CreditWatch uses demonstration-oriented role selection. It should not be exposed as a production lending application or connected to real borrower data without implementing appropriate identity verification, authorization, encryption, concurrency controls, and operational safeguards.
+
+---
+
+## 16. Disclaimer
+
+CreditWatch is a **demonstration and educational application** developed using synthetic borrower and financial data.
+
+It is not a production credit decision system, regulatory monitoring platform, or substitute for professional credit appraisal.
+
+EWS severity levels, financial thresholds, portfolio classifications, and AI observations are illustrative.
+
+The application is intended to demonstrate practical approaches to post-sanction credit monitoring, financial analysis, workflow management, persistent data storage, and AI-assisted credit risk interpretation.
+
+---
+
+**CreditWatch — Corporate & MSME Credit Monitoring and Early Warning Intelligence**
