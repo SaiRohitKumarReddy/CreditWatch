@@ -126,20 +126,60 @@ class SheetsStore:
         self.root = Path(root).resolve()
         secrets_path = self.root / ".streamlit" / "secrets.toml"
         credentials_path = self.root / ".streamlit" / "creditwatch_service_account.json"
-        if not secrets_path.is_file() or not credentials_path.is_file():
-            raise FileNotFoundError(
-                "Google Sheets credentials missing from .streamlit. "
-                "Keep secrets.toml and creditwatch_service_account.json local and private."
-            )
-        with secrets_path.open("rb") as fp:
-            secrets = tomllib.load(fp)
-        spreadsheet_id = str(secrets["creditwatch_sheets"]["spreadsheet_id"]).strip()
+
+        # Local development reads a private secrets.toml. Streamlit Community
+        # Cloud exposes the SAME sections via st.secrets, without local files.
+        if secrets_path.is_file():
+            with secrets_path.open("rb") as fp:
+                secrets = tomllib.load(fp)
+        else:
+            try:
+                import streamlit as st
+                secrets = st.secrets
+            except Exception as exc:
+                raise RuntimeError(
+                    "Google Sheets configuration missing: configure Streamlit "
+                    "Secrets or a local .streamlit/secrets.toml."
+                ) from exc
+
+        try:
+            sheets_config = secrets["creditwatch_sheets"]
+            spreadsheet_id = str(sheets_config["spreadsheet_id"]).strip()
+        except (KeyError, TypeError) as exc:
+            raise ValueError(
+                "Missing [creditwatch_sheets] spreadsheet_id in Streamlit Secrets."
+            ) from exc
         if not spreadsheet_id:
-            raise ValueError("Missing creditwatch_sheets.spreadsheet_id in secrets.toml")
-        client = gspread.service_account(
-            filename=str(credentials_path),
-            scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        )
+            raise ValueError("Google Sheets spreadsheet_id must not be empty")
+
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        if credentials_path.is_file():
+            # Preserve the existing Windows/local setup unchanged.
+            client = gspread.service_account(
+                filename=str(credentials_path), scopes=scopes
+            )
+        else:
+            # Cloud: JSON credentials stored as TOML multiline literal text,
+            # not as a credentials file committed to GitHub.
+            raw_credentials = sheets_config.get("service_account_json")
+            if not raw_credentials:
+                raise ValueError(
+                    "Missing creditwatch_sheets.service_account_json in Streamlit "
+                    "Secrets. Paste the service-account JSON inside triple single "
+                    "quotes in the Secrets editor."
+                )
+            try:
+                credentials = json.loads(str(raw_credentials))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "Invalid creditwatch_sheets.service_account_json; use "
+                    "valid JSON inside a TOML multiline literal string."
+                ) from exc
+            if not isinstance(credentials, dict) or credentials.get("type") != "service_account":
+                raise ValueError("Invalid Google service-account credentials")
+            client = gspread.service_account_from_dict(
+                credentials, scopes=scopes
+            )
         self._spreadsheet = client.open_by_key(spreadsheet_id)
         self._worksheets = {ws.title: ws for ws in self._spreadsheet.worksheets()}
         missing = set(SECTIONS) - set(self._worksheets)
