@@ -1,4 +1,3 @@
-
 # CreditWatch — Credit Monitoring & Early Warning System
 
 **A Python-based Credit Risk Monitoring and Early Warning System for Corporate and MSME Lending**
@@ -173,7 +172,7 @@ The application includes role-based demonstration access. It is not a production
 | Frontend | HTML, CSS, JavaScript |
 | API Framework | FastAPI (optional) |
 | Database | Google Sheets |
-| Local Backup Storage | JSON |
+| Local Fallback Storage | JSON (not synchronized with Google Sheets) |
 | AI Integration | Groq API |
 | Financial Analysis | Python-based calculations |
 | Version Control | GitHub |
@@ -224,7 +223,7 @@ When Google Sheets storage is enabled:
 - Application changes are written to Google Sheets.
 - Existing borrower information can be retrieved from the shared database.
 - Monitoring updates and investigation notes persist across application restarts.
-- Local JSON storage remains available as a separate backup option.
+- Local JSON storage remains available for rollback or separate development; it is **not automatically synchronized** with new Google Sheets changes.
 
 The Google Sheets adapter is designed for this demonstration application. Production lending systems would require stronger concurrency management, authentication, audit controls, and transactional database guarantees.
 
@@ -279,7 +278,7 @@ Private credential files, generated JSON databases, and local backups are intent
 - Python 3.11 or later
 - Internet access for Google Sheets integration
 - Google Cloud service account with Google Sheets access
-- Groq API key for optional Generative AI features
+- Groq API key (required to run the integrated AI Risk Investigation Engine and AI Portfolio Intelligence)
 
 ### Step 1 — Download the Repository
 
@@ -293,7 +292,7 @@ Open a terminal inside the extracted project directory.
 python -m pip install -r requirements.txt
 ```
 
-### Step 3 — Configure Google Sheets
+### Step 3 — Configure Google Sheets and Groq AI
 
 Create a `.streamlit` folder inside the project directory if it does not exist.
 
@@ -308,9 +307,12 @@ Create a private `.streamlit/secrets.toml` file containing:
 ```toml
 [creditwatch_sheets]
 spreadsheet_id = "YOUR_GOOGLE_SPREADSHEET_ID"
+
+[groq]
+api_key = "YOUR_GROQ_API_KEY"
 ```
 
-The Google spreadsheet must be shared with the service account email address with appropriate editing permissions.
+The Google spreadsheet must be shared with the service account email address with appropriate editing permissions. A valid Groq API key is required to run the integrated AI Risk Investigation Engine and AI Portfolio Intelligence.
 
 **Never commit service account credentials or API keys to GitHub.**
 
@@ -360,7 +362,7 @@ Both capabilities operate on financial information, ratios, EWS results, and por
 
 CreditWatch uses Groq's `openai/gpt-oss-20b` model for these intelligence features.
 
-A valid Groq API key must be configured securely in the deployment environment to execute live AI requests. The API key is never included in the public GitHub repository.
+A valid Groq API key is **required to run these integrated AI capabilities**. Configure it securely in `.streamlit/secrets.toml` for local development or in the hosting platform's protected secrets configuration when deployed. The API key must never be included in the public GitHub repository.
 
 ---
 
