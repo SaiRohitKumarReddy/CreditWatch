@@ -52,7 +52,7 @@ const smallnote=t=>`<div class="mini-note">${ico('shield',14)}${E(t)}</div>`;
 function newOnboardState(){
   return {step:1,details:{legal_constitution:'Private Limited',segment:'MSME'},
     sanction:{},facilities:[{facility_type:'CC',sanctioned_limit:'',interest_rate:'',maturity_date:'',outstanding_cr:''}],
-    baselines:[],pending:null,completed:null};
+    baselines:[],pending:null,completed:null,error:''};
 }
 const obOpt=(value,selected)=>`<option value="${E(value)}" ${String(value)===String(selected)?'selected':''}>${E(value)}</option>`;
 const obField=(title,name,value='',type='text',extra='',required=true)=>`<label class="cw-ob-field"><span>${E(title)}${required?' <b class="cw-ob-required">*</b>':''}</span><input name="${E(name)}" type="${E(type)}" value="${E(value)}" ${extra} ${required?'required':''}></label>`;
@@ -62,7 +62,9 @@ function obDateOffset(days){const x=new Date();x.setDate(x.getDate()+days);retur
 function onboardCollect(root){
   const form=root.querySelector('form[data-onboard-step]');
   if(!form)return;
-  const s=ui.onboard,fd=new FormData(form),step=Number(form.dataset.onboardStep);
+  const s=ui.onboard,step=Number(form.dataset.onboardStep);
+  if(!onboardCanEdit(s,step,currentData?.onboarding||{}))return;
+  const fd=new FormData(form);
   if(step===1){
     const fields=['company_name','legal_constitution','sector','sub_industry','location','registration_no','gstin','segment','description'];
     for(const field of fields)s.details[field]=String(fd.get(field)||'').trim();
@@ -97,9 +99,93 @@ function onboardCollect(root){
   }
 }
 
+// CW_ONBOARD_STAGE_PREVIEW_V2
+// All four stages are always visible. Only editing is sequential.
+// Python remains the authoritative validator before Google Sheets is changed.
+const obTrim = value => String(value??'').trim();
+const obNum = value => obTrim(value)!=='' && Number.isFinite(Number(value)) ? Number(value) : null;
+const obISODate = value => {
+  const str=obTrim(value);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(str))return false;
+  const d=new Date(str+'T00:00:00Z');
+  return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===str;
+};
+function onboardStepIssues(step,s,o={}){
+  const issues=[];
+  if(step===1){
+    const d=s.details||{};
+    const t=(k)=>obTrim(d[k]);
+    if(t('company_name').length<3||t('company_name').length>180)issues.push('Enter a borrower name of 3–180 characters.');
+    if(!(o.legal_constitutions||[]).includes(t('legal_constitution')))issues.push('Select a legal constitution.');
+    if(!Object.prototype.hasOwnProperty.call(o.sectors||{},t('sector')))issues.push('Select an industry sector.');
+    if(t('sub_industry').length<2 || !(o.sectors?.[t('sector')]||[]).includes(t('sub_industry')))issues.push('Select a sub sector.');
+    if(t('location').length<3||t('location').length>150)issues.push('Enter the registered HQ location.');
+    if(!/^[A-Za-z0-9/-]{5,40}$/.test(t('registration_no')))issues.push('Enter a valid CIN / registration number (5–40 characters).');
+    if(!/^[0-9]{2}[A-Za-z0-9]{13}$/.test(t('gstin')))issues.push('Enter a valid 15-character GSTIN.');
+    if(!['MSME','Corporate'].includes(t('segment')))issues.push('Select the borrower segment.');
+    if(t('description').length>750)issues.push('Business description is too long.');
+  }
+  if(step===2){
+    const a=s.sanction||{}, sanction=obTrim(a.sanction_date),due=obTrim(a.monitoring_due_date);
+    const today=obDateOffset(0);
+    if(!obISODate(sanction)||sanction>today)issues.push('Enter a valid sanction date that is not in the future.');
+    if(!obISODate(due)||due<sanction)issues.push('First monitoring due date must be on or after the sanction date.');
+    if(!Array.isArray(s.facilities)||s.facilities.length<1||s.facilities.length>8)issues.push('Enter 1–8 sanctioned facilities.');
+    (s.facilities||[]).forEach((f,i)=>{
+      const label=`Facility ${i+1}`;
+      if(!(o.facility_types||['CC','OD','TERM','BG']).includes(f.facility_type))issues.push(`${label}: select the facility type.`);
+      const limit=obNum(f.sanctioned_limit),rate=obNum(f.interest_rate),os=obNum(f.outstanding_cr);
+      if(limit===null||limit<0.000001||limit>1e8)issues.push(`${label}: enter a positive sanctioned limit.`);
+      if(rate===null||rate<0||rate>40)issues.push(`${label}: enter a valid annual interest rate (0–40%).`);
+      if(!obISODate(f.maturity_date)||f.maturity_date<sanction)issues.push(`${label}: maturity must not precede sanction.`);
+      if(obTrim(f.outstanding_cr)!==''){
+        if(os===null||os<0||os>1e8)issues.push(`${label}: enter a valid opening outstanding.`);
+        if(f.facility_type==='BG')issues.push(`${label}: BG cannot have a funded opening outstanding.`);
+        if(limit!==null&&os!==null&&os>limit+1e-6)issues.push(`${label}: outstanding exceeds sanctioned limit.`);
+      }
+    });
+  }
+  if(step===3){
+    const yrs=s.baselines||[],keys=Object.values(o.financial_groups||{}).flatMap(fields=>Object.keys(fields));
+    if(yrs.length<1||yrs.length>3)issues.push('Enter 1–3 baseline financial years.');
+    if(!keys.length)issues.push('Financial fields are unavailable. Reload the application.');
+    const seen=new Set();
+    yrs.forEach((b,i)=>{
+      const fy=Number(b.fy),label=`Baseline year ${i+1}`;
+      const sanctionYear=Number(obTrim(s.sanction?.sanction_date).slice(0,4));
+      if(!Number.isInteger(fy)||fy<2015||fy>new Date().getFullYear()||fy>sanctionYear)issues.push(`${label}: select a valid financial year on or before sanction.`);
+      if(seen.has(fy))issues.push(`FY${fy} is entered more than once.`);
+      seen.add(fy);
+      if(!['Audited','Provisional'].includes(b.statement_type))issues.push(`${label}: choose a statement type.`);
+      const d=b.data||{};
+      const valid=keys.every(k=>obNum(d[k])!==null&&Math.abs(obNum(d[k]))<=1e8);
+      if(!valid){issues.push(`${label}: complete all financial statement fields with valid amounts.`);return;}
+      const n=k=>Number(d[k]);
+      if(n('revenue')<=0)issues.push(`FY${fy}: revenue must be above zero.`);
+      if(n('total_assets')<=0)issues.push(`FY${fy}: total assets must be above zero.`);
+      for(const k of ['cogs','interest_expense','total_assets','total_liabilities','total_debt','cash','current_assets','current_liabilities','inventory','receivables','payables','capex','principal_due']){
+        if(n(k)<0)issues.push(`FY${fy}: ${k.replace(/_/g,' ')} cannot be negative.`);
+      }
+      if(n('current_assets')>n('total_assets')+.01)issues.push(`FY${fy}: current assets exceed total assets.`);
+      if(n('current_liabilities')>n('total_liabilities')+.01)issues.push(`FY${fy}: current liabilities exceed total liabilities.`);
+      if(Math.abs(n('total_assets')-n('total_liabilities')-n('equity'))>Math.max(.05,n('total_assets')*.01))issues.push(`FY${fy}: balance sheet does not balance.`);
+    });
+  }
+  return issues;
+}
+function onboardBlockedBy(s,requestedStep,o){
+  for(let prior=1;prior<requestedStep;prior++){
+    if(onboardStepIssues(prior,s,o).length)return prior;
+  }
+  return 0;
+}
+function onboardCanEdit(s,step,o){return !onboardBlockedBy(s,step,o);}
+
 function onboardPage(d){
  const s=ui.onboard,o=d.onboarding||{},steps=['Borrower Details','Sanction & Facilities','Baseline Financials','Review & Add'];
  const sectorNames=Object.keys(o.sectors||{});
+ const blockedBy=onboardBlockedBy(s,s.step,o);
+ const previewOnly=Boolean(blockedBy);
  const sub=(o.sectors||{})[s.details.sector]||[];
  const formStart=n=>`<form data-onboard-step="${n}" class="cw-ob-form">`;
  const foot=(nextLabel)=>`<div class="cw-ob-actions">${s.step>1?'<button type="button" class="btn btn-outline" data-onboard-back>Back</button>':'<button type="button" class="btn btn-outline" data-onboard-reset>Clear</button>'}<button type="submit" class="btn btn-primary" ${s.pending?'disabled':''}>${E(nextLabel)} ${ico('arrow',14)}</button></div></form>`;
@@ -142,7 +228,7 @@ function onboardPage(d){
  }
  if(s.step===3){
   const groupEntries=Object.entries(o.financial_groups||{});
-  const years=s.baselines;
+  const years=s.baselines.length?s.baselines:[{fy:new Date().getFullYear()-1,statement_type:'Audited',data:{}}];
   content=`${formStart(3)}<div class="cw-ob-panel-title"><h3>3. Baseline Financials</h3><p>Enter 1–3 audited or provisional historical financial years. These are the sanction-reference figures, not post-sanction monitoring updates.</p></div>
     <div class="cw-ob-collection-head"><h4>Historical financial years</h4><button type="button" class="btn btn-outline" data-onboard-add-fy ${years.length>=3?'disabled':''}>${ico('plus',14)} Add financial year</button></div>
     ${years.map((b,i)=>`<div class="cw-ob-repeat"><div class="cw-ob-repeat-head"><strong>Baseline year ${i+1}</strong>${years.length>1?`<button type="button" class="text-action" data-onboard-remove-fy="${i}">Remove</button>`:''}</div>
@@ -170,13 +256,21 @@ function onboardPage(d){
     <label class="cw-ob-confirm"><input type="checkbox" name="ack" required><span>I confirm that these sanction details and baseline financial statements are ready to add to CreditWatch.</span></label>
     ${foot(s.pending?'Saving borrower…':'Confirm & Add Borrower')}`;
  }
- const stepper=`<div class="cw-ob-stepper" aria-label="Onboarding progress">${steps.map((label,i)=>`<div class="cw-ob-step ${i+1===s.step?'active':''} ${i+1<s.step?'done':''}"><span>${i+1<s.step?ico('check',14):i+1}</span><strong>${E(label)}</strong></div>`).join('')}</div>`;
- const side=`<aside class="cw-ob-side"><div class="cw-ob-info"><h3>${ico('file',19)} What happens next?</h3><p>1. Complete the borrower, facility and baseline details.</p><p>2. CreditWatch saves the borrower to Google Sheets.</p><p>3. VP/CRO activates and assigns the borrower for monitoring.</p></div><div class="cw-ob-info"><h3>${ico('check',19)} Onboarding Progress</h3>${steps.map((label,i)=>`<div class="cw-ob-progress ${i+1===s.step?'active':''}"><span>${i+1<s.step?'✓':i+1}</span>${E(label)}</div>`).join('')}</div><div class="cw-ob-access">${ico('shield',20)} <div><b>Access</b><p>Available to Analyst, AVP and VP/CRO.</p></div></div></aside>`;
- return `${sectionHead('SANCTIONED BORROWER MASTER','Onboard Borrower','Add a newly sanctioned borrower to CreditWatch for monitoring.')}${stepper}<div class="cw-ob-layout"><section class="panel cw-ob-main">${content}</section>${side}</div>`;
+ const stepper=`<div class="cw-ob-stepper" aria-label="Onboarding stages — click any stage to view">${steps.map((label,i)=>{
+    const n=i+1,done=n<s.step&&!onboardStepIssues(n,s,o).length,locked=!!onboardBlockedBy(s,n,o);
+    return `<button type="button" data-onboard-jump="${n}" class="cw-ob-step ${n===s.step?'active':''} ${done?'done':''} ${locked?'preview':''}" ${n===s.step?'aria-current="step"':''} ${s.pending?'disabled':''} title="${locked?'View fields — complete earlier stages to edit':'Open '+E(label)}"><span>${done?ico('check',14):n}</span><strong>${E(label)}</strong></button>`;
+  }).join('')}</div>`;
+ const side=`<aside class="cw-ob-side"><div class="cw-ob-info"><h3>${ico('file',19)} What happens next?</h3><p>1. Complete the borrower, facility and baseline details.</p><p>2. CreditWatch saves the borrower to Google Sheets.</p><p>3. VP/CRO activates and assigns the borrower for monitoring.</p></div><div class="cw-ob-info"><h3>${ico('check',19)} Onboarding Progress</h3>${steps.map((label,i)=>{
+    const n=i+1,done=n<s.step&&!onboardStepIssues(n,s,o).length;
+    return `<button type="button" data-onboard-jump="${n}" class="cw-ob-progress ${n===s.step?'active':''}" ${n===s.step?'aria-current="step"':''} ${s.pending?'disabled':''}><span>${done?'✓':n}</span>${E(label)}${onboardBlockedBy(s,n,o)?'<small>View only</small>':''}</button>`;
+  }).join('')}</div><div class="cw-ob-access">${ico('shield',20)} <div><b>Access</b><p>Available to Analyst, AVP and VP/CRO.</p></div></div></aside>`;
+ const lockNotice=previewOnly?`<div class="cw-ob-preview-banner" role="status"><div>${ico('shield',18)} <span><strong>Preview only.</strong> Complete <b>${E(steps[blockedBy-1])}</b> to enter data in this stage. You can view the required fields now, but cannot change them.</span></div><button type="button" class="btn btn-outline" data-onboard-jump="${blockedBy}">Go to ${E(steps[blockedBy-1])}</button></div>`:'';
+ const validationNotice=s.error?`<div class="cw-ob-error" role="alert">${ico('alert',17)} ${E(s.error)}</div>`:'';
+ return `${sectionHead('SANCTIONED BORROWER MASTER','Onboard Borrower','Add a newly sanctioned borrower to CreditWatch for monitoring.')}${stepper}<div class="cw-ob-layout"><section class="panel cw-ob-main ${previewOnly?'cw-ob-readonly':''}">${lockNotice}${validationNotice}${content}</section>${side}</div>`;
 }
 
 const ui={
- page:'onboard',
+ page:'guide',
  onboard:newOnboardState(),
  tab:'snapshot',
  signal:'CW-01',
@@ -432,8 +526,8 @@ function loginPage(d){return `<div class="login">
 
 
 const NAV=[
- ['onboard','plus','Onboard Borrower'],
  ['guide','file','How It Works'],
+ ['onboard','plus','Onboard Borrower'],
  ['overview','dashboard','Command Centre'],
  ['borrower','building','Borrower Monitoring'],
  ['ews','alert','Early Warning Desk'],
@@ -2373,7 +2467,7 @@ function draw(component){
     ui.onboard.pending=null;
  }
  if(ui.onboard.pending && currentData.notice?.type==='error')ui.onboard.pending=null;
- if(!allowedNav(currentData).some(x=>x[0]===ui.page))ui.page='onboard';
+ if(!allowedNav(currentData).some(x=>x[0]===ui.page))ui.page=allowedNav(currentData)[0]?.[0]||'guide';
 
  let body;
  switch(ui.page){
@@ -2396,10 +2490,16 @@ function attach(component){
  // CW_ONBOARD_BORROWER_EVENTS_V1: browser-side draft, server-side final validation.
  root.querySelectorAll('form[data-onboard-step]').forEach(form=>form.addEventListener('submit',e=>{
    e.preventDefault();
-   if(ui.onboard.pending || !form.reportValidity())return;
+   const stage=Number(form.dataset.onboardStep);
+   if(ui.onboard.pending||!onboardCanEdit(ui.onboard,stage,currentData.onboarding))return;
+   if(!form.reportValidity())return;
    onboardCollect(root);
-   if(ui.onboard.step<4){
-     ui.onboard.step++;
+   const issues=stage<4?onboardStepIssues(stage,ui.onboard,currentData.onboarding):
+     [1,2,3].flatMap(n=>onboardStepIssues(n,ui.onboard,currentData.onboarding));
+   if(issues.length){ui.onboard.error=issues[0];draw(component);return;}
+   ui.onboard.error='';
+   if(stage<4){
+     ui.onboard.step=stage+1;
      draw(component);
      window.scrollTo?.(0,0);
    }else{
@@ -2411,8 +2511,24 @@ function attach(component){
      draw(component);
    }
  }));
+ // Viewing never requires earlier stages to be complete. Editing does.
+ root.querySelectorAll('[data-onboard-jump]').forEach(btn=>btn.addEventListener('click',()=>{
+   if(ui.onboard.pending)return;
+   const stage=Number(btn.dataset.onboardJump);
+   if(!Number.isInteger(stage)||stage<1||stage>4)return;
+   onboardCollect(root); // capture the current draft, including incomplete fields
+   ui.onboard.error='';
+   ui.onboard.step=stage;
+   draw(component);
+   window.scrollTo?.(0,0);
+ }));
+ // Disabled controls preserve the form's visible preview but prevent all edits.
+ const previewForm=root.querySelector('form[data-onboard-step]');
+ if(previewForm&&!onboardCanEdit(ui.onboard,Number(previewForm.dataset.onboardStep),currentData.onboarding)){
+   previewForm.querySelectorAll('input,select,textarea,button:not([data-onboard-back])').forEach(el=>{el.disabled=true;});
+ }
  root.querySelectorAll('[data-onboard-back]').forEach(btn=>btn.addEventListener('click',()=>{
-   onboardCollect(root);ui.onboard.step=Math.max(1,ui.onboard.step-1);draw(component);
+   onboardCollect(root);ui.onboard.error='';ui.onboard.step=Math.max(1,ui.onboard.step-1);draw(component);
  }));
  root.querySelectorAll('[data-onboard-reset]').forEach(btn=>btn.addEventListener('click',()=>{
    ui.onboard=newOnboardState();draw(component);
@@ -2544,7 +2660,7 @@ function attach(component){
  }));
 
  root.querySelectorAll('[data-logout]').forEach(el=>el.addEventListener('click',()=>{
-  ui.page='onboard';
+  ui.page='guide';
   ui.onboard=newOnboardState();
   ui.tab='snapshot';
   ui.investigationPriority='ALL';
