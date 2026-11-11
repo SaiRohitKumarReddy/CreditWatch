@@ -48,8 +48,136 @@ const tcell=(txt,klass='')=>`<td class="${klass}">${txt}</td>`;
 const btn=(name,kind,variant='')=>`<button class="btn ${variant}" type="submit" name="kind" value="${E(kind)}">${E(name)}</button>`;
 const smallnote=t=>`<div class="mini-note">${ico('shield',14)}${E(t)}</div>`;
 
+// CW_ONBOARD_BORROWER_UI_V1: four-stage UI; all writes go through Python.
+function newOnboardState(){
+  return {step:1,details:{legal_constitution:'Private Limited',segment:'MSME'},
+    sanction:{},facilities:[{facility_type:'CC',sanctioned_limit:'',interest_rate:'',maturity_date:'',outstanding_cr:''}],
+    baselines:[],pending:null,completed:null};
+}
+const obOpt=(value,selected)=>`<option value="${E(value)}" ${String(value)===String(selected)?'selected':''}>${E(value)}</option>`;
+const obField=(title,name,value='',type='text',extra='',required=true)=>`<label class="cw-ob-field"><span>${E(title)}${required?' <b class="cw-ob-required">*</b>':''}</span><input name="${E(name)}" type="${E(type)}" value="${E(value)}" ${extra} ${required?'required':''}></label>`;
+const obSelect=(title,name,values,selected='',required=true)=>`<label class="cw-ob-field"><span>${E(title)}${required?' <b class="cw-ob-required">*</b>':''}</span><select name="${E(name)}" ${required?'required':''}><option value="">Select ${E(title.toLowerCase())}</option>${values.map(s=>obOpt(s,selected)).join('')}</select></label>`;
+function obDateOffset(days){const x=new Date();x.setDate(x.getDate()+days);return x.toISOString().slice(0,10);}
+
+function onboardCollect(root){
+  const form=root.querySelector('form[data-onboard-step]');
+  if(!form)return;
+  const s=ui.onboard,fd=new FormData(form),step=Number(form.dataset.onboardStep);
+  if(step===1){
+    const fields=['company_name','legal_constitution','sector','sub_industry','location','registration_no','gstin','segment','description'];
+    for(const field of fields)s.details[field]=String(fd.get(field)||'').trim();
+    // Start with the last completed FY, unless sanction was in an earlier year.
+    if(!s.baselines.length){
+      const sanctionFY=Number(s.sanction.sanction_date?.slice(0,4)||new Date().getFullYear());
+      s.baselines=[{fy:Math.min(new Date().getFullYear()-1,sanctionFY),statement_type:'Audited',data:{}}];
+    }
+  }
+  else if(step===2){
+    for(const field of ['sanction_date','monitoring_due_date'])s.sanction[field]=String(fd.get(field)||'');
+    s.facilities=s.facilities.map((f,i)=>({
+      facility_type:String(fd.get(`f.${i}.facility_type`)||''),
+      sanctioned_limit:String(fd.get(`f.${i}.sanctioned_limit`)||''),
+      interest_rate:String(fd.get(`f.${i}.interest_rate`)||''),
+      maturity_date:String(fd.get(`f.${i}.maturity_date`)||''),
+      outstanding_cr:String(fd.get(`f.${i}.outstanding_cr`)||''),
+    }));
+    if(s.baselines.length){
+      const sanctionFY=Number(s.sanction.sanction_date?.slice(0,4)||new Date().getFullYear());
+      for(const r of s.baselines){if(Number(r.fy)>sanctionFY)r.fy=sanctionFY;}
+    }
+  }
+  else if(step===3){
+    s.baselines=s.baselines.map((b,i)=>({
+      fy:String(fd.get(`b.${i}.fy`)||''),
+      statement_type:String(fd.get(`b.${i}.statement_type`)||'Audited'),
+      data:Object.fromEntries(Object.keys(currentData.onboarding.financial_groups)
+        .flatMap(k=>Object.keys(currentData.onboarding.financial_groups[k]))
+        .map(field=>[field,String(fd.get(`b.${i}.${field}`)??'')]))
+    }));
+  }
+}
+
+function onboardPage(d){
+ const s=ui.onboard,o=d.onboarding||{},steps=['Borrower Details','Sanction & Facilities','Baseline Financials','Review & Add'];
+ const sectorNames=Object.keys(o.sectors||{});
+ const sub=(o.sectors||{})[s.details.sector]||[];
+ const formStart=n=>`<form data-onboard-step="${n}" class="cw-ob-form">`;
+ const foot=(nextLabel)=>`<div class="cw-ob-actions">${s.step>1?'<button type="button" class="btn btn-outline" data-onboard-back>Back</button>':'<button type="button" class="btn btn-outline" data-onboard-reset>Clear</button>'}<button type="submit" class="btn btn-primary" ${s.pending?'disabled':''}>${E(nextLabel)} ${ico('arrow',14)}</button></div></form>`;
+ let content='';
+ if(s.completed){
+   return `${sectionHead('SANCTIONED BORROWER MASTER','Onboard Borrower','Register newly sanctioned borrowers for post-sanction monitoring.')}
+   <section class="panel cw-ob-done">${ico('check',38)}<h2>Borrower added successfully</h2><p><strong>${E(s.completed)}</strong> has been saved in Existing Borrowers, with its facilities and baseline financials. Monitoring is not yet active.</p><p>VP/CRO can activate this borrower and assign it to Analyst from Review & Approvals → Assignment & Ownership.</p><div class="cw-ob-actions"><button type="button" class="btn btn-outline" data-onboard-reset>Onboard another borrower</button><button type="button" class="btn btn-primary" data-onboard-view="${E(s.completed)}">View borrower ${ico('arrow',14)}</button></div></section>`;
+ }
+ if(s.step===1){
+  content=`${formStart(1)}<div class="cw-ob-panel-title"><h3>1. Borrower Details</h3><p>Enter the basic information of a newly sanctioned corporate or MSME borrower.</p></div>
+    <div class="cw-ob-grid">
+      <label class="cw-ob-field"><span>Borrower ID</span><input value="${E(o.next_id||'Generated on save')}" disabled><small>Automatically assigned when the record is saved</small></label>
+      ${obField('Borrower Name','company_name',s.details.company_name||'','text','maxlength="180"')}
+      ${obSelect('Legal Constitution','legal_constitution',o.legal_constitutions||[],s.details.legal_constitution)}
+      ${obSelect('Industry Sector','sector',sectorNames,s.details.sector)}
+      ${obSelect('Sub Sector','sub_industry',sub,s.details.sub_industry)}
+      ${obField('Location (Registered HQ)','location',s.details.location||'','text','maxlength="150"')}
+      ${obField('CIN / Registration No.','registration_no',s.details.registration_no||'','text','maxlength="40"')}
+      ${obField('GSTIN','gstin',s.details.gstin||'','text','minlength="15" maxlength="15" pattern="[0-9A-Za-z]{15}"')}
+      ${obSelect('Borrower Segment','segment',['MSME','Corporate'],s.details.segment)}
+    </div>
+    <label class="cw-ob-field cw-ob-description"><span>Brief Business Description (Optional)</span><textarea name="description" rows="3" maxlength="750" placeholder="What does the company do?">${E(s.details.description||'')}</textarea></label>
+    ${foot('Next: Sanction & Facilities')}`;
+ }
+ if(s.step===2){
+  content=`${formStart(2)}<div class="cw-ob-panel-title"><h3>2. Sanction & Facilities</h3><p>Enter the sanction date and actual credit facilities. All amounts are in ₹ crore.</p></div>
+    <div class="cw-ob-grid">${obField('Sanction Date','sanction_date',s.sanction.sanction_date||'','date',`max="${obDateOffset(0)}"`)}
+    ${obField('First Monitoring Due Date','monitoring_due_date',s.sanction.monitoring_due_date||obDateOffset(90),'date')}</div>
+    <div class="cw-ob-collection-head"><h4>Sanctioned credit facilities</h4><button class="btn btn-outline" type="button" data-onboard-add-facility ${s.facilities.length>=8?'disabled':''}>${ico('plus',14)} Add facility</button></div>
+    ${s.facilities.map((f,i)=>`<div class="cw-ob-repeat"><div class="cw-ob-repeat-head"><strong>Facility ${i+1}</strong>${s.facilities.length>1?`<button type="button" class="text-action" data-onboard-remove-facility="${i}">Remove</button>`:''}</div>
+      <div class="cw-ob-grid">
+        ${obSelect('Facility Type',`f.${i}.facility_type`,o.facility_types||['CC','OD','TERM','BG'],f.facility_type)}
+        ${obField('Sanctioned Limit (₹ Cr)',`f.${i}.sanctioned_limit`,f.sanctioned_limit,'number','min="0.000001" step="any"')}
+        ${obField('Annual Interest Rate (%)',`f.${i}.interest_rate`,f.interest_rate,'number','min="0" max="40" step="any"')}
+        ${obField('Maturity Date',`f.${i}.maturity_date`,f.maturity_date,'date')}
+        ${obField('Opening Outstanding (₹ Cr)',`f.${i}.outstanding_cr`,f.outstanding_cr,'number','min="0" step="any"',false)}
+      </div><p class="cw-ob-hint">Opening outstanding is optional for funded facilities. Leave it blank if it is not verified; never treat missing data as zero. BG has no funded outstanding.</p>
+    </div>`).join('')}
+    ${foot('Next: Baseline Financials')}`;
+ }
+ if(s.step===3){
+  const groupEntries=Object.entries(o.financial_groups||{});
+  const years=s.baselines;
+  content=`${formStart(3)}<div class="cw-ob-panel-title"><h3>3. Baseline Financials</h3><p>Enter 1–3 audited or provisional historical financial years. These are the sanction-reference figures, not post-sanction monitoring updates.</p></div>
+    <div class="cw-ob-collection-head"><h4>Historical financial years</h4><button type="button" class="btn btn-outline" data-onboard-add-fy ${years.length>=3?'disabled':''}>${ico('plus',14)} Add financial year</button></div>
+    ${years.map((b,i)=>`<div class="cw-ob-repeat"><div class="cw-ob-repeat-head"><strong>Baseline year ${i+1}</strong>${years.length>1?`<button type="button" class="text-action" data-onboard-remove-fy="${i}">Remove</button>`:''}</div>
+      <div class="cw-ob-grid">${obField('Financial Year',`b.${i}.fy`,b.fy,'number',`min="2015" max="${Math.min(new Date().getFullYear(),Number(s.sanction.sanction_date?.slice(0,4)||new Date().getFullYear()))}" step="1"`)}
+      ${obSelect('Statement Type',`b.${i}.statement_type`,['Audited','Provisional'],b.statement_type||'Audited')}</div>
+      ${groupEntries.map(([group,fields])=>`<div class="cw-ob-fin-group"><h4>${E(group)} <small>₹ Cr</small></h4><div class="cw-ob-fin-grid">${Object.entries(fields).map(([key,label])=>obField(label,`b.${i}.${key}`,(b.data||{})[key]??'','number','step="any"')).join('')}</div></div>`).join('')}
+    </div>`).join('')}
+    <p class="cw-ob-hint">The Python finance engine validates balance-sheet equality, revenue and required numeric fields before saving. Missing fields cannot be silently assumed to be zero.</p>
+    ${foot('Next: Review & Add')}`;
+ }
+ if(s.step===4){
+  const d0=s.details, sa=s.sanction;
+  content=`${formStart(4)}<div class="cw-ob-panel-title"><h3>4. Review & Add</h3><p>Check all details before creating this borrower. The master record is created only once, on confirmation.</p></div>
+    <div class="cw-ob-review-grid">
+     <div class="cw-ob-review"><h4>Borrower</h4><dl>
+       <dt>ID (reserved preview)</dt><dd>${E(o.next_id)}</dd><dt>Company</dt><dd>${E(d0.company_name)}</dd>
+       <dt>Legal constitution</dt><dd>${E(d0.legal_constitution)}</dd><dt>Sector / Sub-sector</dt><dd>${E(d0.sector)} / ${E(d0.sub_industry)}</dd>
+       <dt>Segment</dt><dd>${E(d0.segment)}</dd><dt>Location</dt><dd>${E(d0.location)}</dd>
+       <dt>CIN / Registration</dt><dd>${E(d0.registration_no)}</dd><dt>GSTIN</dt><dd>${E(d0.gstin)}</dd>
+     </dl></div>
+     <div class="cw-ob-review"><h4>Sanction</h4><dl><dt>Sanction date</dt><dd>${E(sa.sanction_date)}</dd><dt>Monitoring due</dt><dd>${E(sa.monitoring_due_date)}</dd><dt>Facilities</dt><dd>${s.facilities.length}</dd><dt>Sanctioned total</dt><dd>${CR(s.facilities.reduce((v,f)=>v+Number(f.sanctioned_limit||0),0))}</dd><dt>Baseline FYs</dt><dd>${s.baselines.map(b=>`FY${E(b.fy)}`).join(', ')}</dd></dl></div>
+    </div>
+    <div class="cw-ob-review"><h4>Facilities</h4>${table(['Facility','Type','Sanctioned limit','Opening O/S','Maturity'],s.facilities.map((f,i)=>`<tr><td>${i+1}</td><td>${E(f.facility_type)}</td><td>${CR(f.sanctioned_limit)}</td><td>${f.outstanding_cr===''?'Not provided':CR(f.outstanding_cr)}</td><td>${E(f.maturity_date)}</td></tr>`))}</div>
+    <div class="cw-ob-note">${ico('shield',17)} <span>The borrower will appear in <strong>Existing Borrowers</strong> as <strong>Not activated</strong>. Only VP/CRO can activate monitoring and assign responsibility. No transaction history or EWS triggers are fabricated. Use synthetic demo information until the app is access-controlled.</span></div>
+    <label class="cw-ob-confirm"><input type="checkbox" name="ack" required><span>I confirm that these sanction details and baseline financial statements are ready to add to CreditWatch.</span></label>
+    ${foot(s.pending?'Saving borrower…':'Confirm & Add Borrower')}`;
+ }
+ const stepper=`<div class="cw-ob-stepper" aria-label="Onboarding progress">${steps.map((label,i)=>`<div class="cw-ob-step ${i+1===s.step?'active':''} ${i+1<s.step?'done':''}"><span>${i+1<s.step?ico('check',14):i+1}</span><strong>${E(label)}</strong></div>`).join('')}</div>`;
+ const side=`<aside class="cw-ob-side"><div class="cw-ob-info"><h3>${ico('file',19)} What happens next?</h3><p>1. Complete the borrower, facility and baseline details.</p><p>2. CreditWatch saves the borrower to Google Sheets.</p><p>3. VP/CRO activates and assigns the borrower for monitoring.</p></div><div class="cw-ob-info"><h3>${ico('check',19)} Onboarding Progress</h3>${steps.map((label,i)=>`<div class="cw-ob-progress ${i+1===s.step?'active':''}"><span>${i+1<s.step?'✓':i+1}</span>${E(label)}</div>`).join('')}</div><div class="cw-ob-access">${ico('shield',20)} <div><b>Access</b><p>Available to Analyst, AVP and VP/CRO.</p></div></div></aside>`;
+ return `${sectionHead('SANCTIONED BORROWER MASTER','Onboard Borrower','Add a newly sanctioned borrower to CreditWatch for monitoring.')}${stepper}<div class="cw-ob-layout"><section class="panel cw-ob-main">${content}</section>${side}</div>`;
+}
+
 const ui={
- page:'overview',
+ page:'onboard',
+ onboard:newOnboardState(),
  tab:'snapshot',
  signal:'CW-01',
  financialEditor:null,
@@ -304,6 +432,7 @@ function loginPage(d){return `<div class="login">
 
 
 const NAV=[
+ ['onboard','plus','Onboard Borrower'],
  ['guide','file','How It Works'],
  ['overview','dashboard','Command Centre'],
  ['borrower','building','Borrower Monitoring'],
@@ -608,6 +737,7 @@ function spark(values){
 }
 
 const WORKSPACE_GUIDE={
+ onboard:['Register a newly sanctioned borrower','Enter borrower details, sanctioned facilities and historical financial statements. Analyst, AVP and VP/CRO can onboard; VP/CRO activates monitoring separately.'],
  overview:['Portfolio-wide oversight','Monitor all sanctioned borrowers, exposure at risk, overdue monitoring reports, risk concentrations and the AVP/CRO review pipeline.'],
  borrower:['Your main borrower workspace','Choose an existing borrower, inspect the read-only sanction baseline, compare post-sanction financials, investigate trends and prepare a monitoring submission. Analyst can edit draft/returned years; AVP can correct submissions; VP/CRO can also amend the baseline with an audit trail.'],
  ews:['Investigate early warning alerts','Review the ten signals and their source evidence, see affected borrowers, investigate alerts and document follow-up. Closing or escalating a case requires AVP/VP-CRO authority.'],
@@ -632,9 +762,9 @@ const EWS_GUIDE=[
 function guidePage(d){
  const roleTitle=d.role==='Analyst'?'Monitoring Analyst':d.role==='AVP'?'Monitoring AVP':'VP / Chief Risk Officer';
  const roleIntro={
-  Analyst:'Prepare new monitoring periods, examine post-sanction financial movements, investigate early warning signals and submit reports to AVP. Approval and Monitoring Data are restricted.',
-  AVP:'Review existing borrowers and EWS alerts, correct submitted monitoring financials, approve or return reports, and use controlled monitoring data tools. VP/CRO gives final approval.',
-  'VP/CRO':'Full access to the monitoring portfolio, review pipeline, data tools and all borrower actions, including audited baseline corrections and final report approval.'
+  Analyst:'Onboard newly sanctioned borrowers; prepare new monitoring periods, examine post-sanction financial movements, investigate early warning signals and submit reports to AVP. Approval and Monitoring Data are restricted.',
+  AVP:'Onboard newly sanctioned borrowers; review existing borrowers and EWS alerts, correct submitted monitoring financials, approve or return reports, and use controlled monitoring data tools. VP/CRO gives final approval.',
+  'VP/CRO':'Onboard newly sanctioned borrowers and manage full access to the monitoring portfolio, review pipeline, data tools and all borrower actions, including audited baseline corrections and final report approval.'
  }[d.role];
 
  const items=allowedNav(d);
@@ -644,6 +774,7 @@ function guidePage(d){
  return `${sectionHead('NEW TO CREDITWATCH?','How CreditWatch Works','A quick guide to your permitted workspaces, the monitoring approval flow and the ten early warning indicators.')}
  <div class="section-grid"><section class="panel"><div class="panel-head"><div><div class="eyebrow">YOUR ACCESS</div><h3>${E(roleTitle)}</h3></div>${ico('shield',23)}</div><p class="report-text">${E(roleIntro)}</p><div class="evidence-note">${ico('shield',15)} Your sidebar shows only the workspaces available for this designation.</div></section>
  <section class="panel"><div class="panel-head"><div><div class="eyebrow">CREDIT MONITORING WORKFLOW</div><h3>From monitoring to approval</h3></div></div><div class="signal-list">
+ <div class="signal-tile"><span class="sig-id">00</span><div class="sig-text"><b>Onboard a sanctioned borrower</b><p>Analyst, AVP and VP/CRO may register the borrower in the approved master. VP/CRO activates the borrower for monitoring and assigns an Analyst separately.</p></div></div>
  <div class="signal-tile"><span class="sig-id">01</span><div class="sig-text"><b>Analyst prepares</b><p>Choose an existing approved borrower, enter new-period financials, evaluate EWS and submit a post-sanction monitoring report.</p></div></div>
  <div class="signal-tile"><span class="sig-id">02</span><div class="sig-text"><b>AVP reviews</b><p>Check and correct monitoring submissions; approve and forward to VP/CRO or return for revision.</p></div></div>
  <div class="signal-tile"><span class="sig-id">03</span><div class="sig-text"><b>VP/CRO finalizes</b><p>Review the findings, make permitted amendments, approve the final monitoring report, and oversee ongoing portfolio risk.</p></div></div></div></section></div>
@@ -2234,10 +2365,19 @@ function draw(component){
  const root=component.parentElement.querySelector('#creditwatch-html-root')||component.parentElement.querySelector('#creditwatch-root')||component.parentElement;
  if(!currentData||!root)return;
  if(!currentData.authenticated){root.innerHTML=loginPage(currentData);attach(component);return;}
- if(!allowedNav(currentData).some(x=>x[0]===ui.page))ui.page=currentData.role==='VP/CRO'?'overview':'borrower';
+ // A saved borrower only counts as success after the Python server confirms the request.
+ const onboardResult=currentData.onboarding?.result;
+ if(onboardResult && ((ui.onboard.pending && ui.onboard.pending===onboardResult.request_id)
+    || (currentData.notice?.type==='success' && ui.page==='onboard'))){
+    ui.onboard.completed=onboardResult.borrower_id;
+    ui.onboard.pending=null;
+ }
+ if(ui.onboard.pending && currentData.notice?.type==='error')ui.onboard.pending=null;
+ if(!allowedNav(currentData).some(x=>x[0]===ui.page))ui.page='onboard';
 
  let body;
  switch(ui.page){
+  case 'onboard':body=onboardPage(currentData);break;
   case 'borrower':body=borrowerPage(currentData);break;
   case 'ews':body=ewsDesk(currentData);break;
   case 'reviews':body=approvalsPage(currentData);break;
@@ -2253,6 +2393,65 @@ function draw(component){
 function attach(component){
  let root=component.parentElement.querySelector('#creditwatch-html-root')||component.parentElement.querySelector('#creditwatch-root')||component.parentElement;
 
+ // CW_ONBOARD_BORROWER_EVENTS_V1: browser-side draft, server-side final validation.
+ root.querySelectorAll('form[data-onboard-step]').forEach(form=>form.addEventListener('submit',e=>{
+   e.preventDefault();
+   if(ui.onboard.pending || !form.reportValidity())return;
+   onboardCollect(root);
+   if(ui.onboard.step<4){
+     ui.onboard.step++;
+     draw(component);
+     window.scrollTo?.(0,0);
+   }else{
+     const requestId=`ob-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+     ui.onboard.pending=requestId;
+     sendAction(component,{kind:'onboard_borrower',request_id:requestId,
+       payload:{...ui.onboard.details,...ui.onboard.sanction,
+         facilities:ui.onboard.facilities,baselines:ui.onboard.baselines}});
+     draw(component);
+   }
+ }));
+ root.querySelectorAll('[data-onboard-back]').forEach(btn=>btn.addEventListener('click',()=>{
+   onboardCollect(root);ui.onboard.step=Math.max(1,ui.onboard.step-1);draw(component);
+ }));
+ root.querySelectorAll('[data-onboard-reset]').forEach(btn=>btn.addEventListener('click',()=>{
+   ui.onboard=newOnboardState();draw(component);
+ }));
+ root.querySelectorAll('[data-onboard-view]').forEach(btn=>btn.addEventListener('click',()=>{
+   const id=btn.dataset.onboardView;
+   ui.page='borrower';ui.tab='snapshot';ui.financialEditor=null;
+   sendAction(component,{kind:'select_borrower',borrower_id:id});
+ }));
+ root.querySelectorAll('[data-onboard-add-facility]').forEach(btn=>btn.addEventListener('click',()=>{
+   onboardCollect(root);
+   if(ui.onboard.facilities.length<8)ui.onboard.facilities.push({facility_type:'CC',sanctioned_limit:'',interest_rate:'',maturity_date:'',outstanding_cr:''});
+   draw(component);
+ }));
+ root.querySelectorAll('[data-onboard-remove-facility]').forEach(btn=>btn.addEventListener('click',()=>{
+   onboardCollect(root);
+   if(ui.onboard.facilities.length>1)ui.onboard.facilities.splice(Number(btn.dataset.onboardRemoveFacility),1);
+   draw(component);
+ }));
+ root.querySelectorAll('[data-onboard-add-fy]').forEach(btn=>btn.addEventListener('click',()=>{
+   onboardCollect(root);
+   const baselines=ui.onboard.baselines;
+   if(baselines.length<3){const oldest=Math.min(...baselines.map(y=>Number(y.fy)));
+     baselines.push({fy:Math.max(2015,oldest-1),statement_type:'Audited',data:{}});}
+   draw(component);
+ }));
+ root.querySelectorAll('[data-onboard-remove-fy]').forEach(btn=>btn.addEventListener('click',()=>{
+   onboardCollect(root);
+   if(ui.onboard.baselines.length>1)ui.onboard.baselines.splice(Number(btn.dataset.onboardRemoveFy),1);
+   draw(component);
+ }));
+ const sectorSelect=root.querySelector('form[data-onboard-step="1"] select[name="sector"]');
+ if(sectorSelect){sectorSelect.addEventListener('change',()=>{
+   const subSelect=root.querySelector('form[data-onboard-step="1"] select[name="sub_industry"]');
+   if(!subSelect)return;
+   const sectors=currentData.onboarding?.sectors||{};
+   subSelect.innerHTML='<option value="">Select sub sector</option>'+((sectors[sectorSelect.value]||[])
+     .map(value=>obOpt(value,'')).join(''));
+ });}
  root.querySelectorAll('form[data-form]').forEach(f=>f.addEventListener('submit',e=>onForm(e,component)));
  root.querySelectorAll('select[data-ai-risk-borrower]').forEach(el=>el.addEventListener('change',()=>{ui.aiRiskBorrower=el.value;}));
  root.querySelectorAll('select[data-ai-risk-scope]').forEach(el=>el.addEventListener('change',()=>{ui.aiRiskScope=el.value;ui.aiRiskBorrower=null;draw(component);}));
@@ -2345,7 +2544,8 @@ function attach(component){
  }));
 
  root.querySelectorAll('[data-logout]').forEach(el=>el.addEventListener('click',()=>{
-  ui.page='overview';
+  ui.page='onboard';
+  ui.onboard=newOnboardState();
   ui.tab='snapshot';
   ui.investigationPriority='ALL';
   sendAction(component,{kind:'logout'});

@@ -258,3 +258,51 @@
 .app-shell .cw-delete-year-panel .form-actions {display:flex;gap:9px;flex-wrap:wrap;margin-top:10px;}
 .app-shell .cw-delete-confirm-button {background:#a93f42;color:#fff;border:1px solid #a93f42;}
 .app-shell .cw-delete-confirm-button:hover {background:#8f3034;border-color:#8f3034;}
+
+/* CW_ONBOARD_BORROWER_UI_V1 — scoped first-tab onboarding wizard. */
+.cw-ob-stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 22px}
+.cw-ob-step{display:flex;align-items:center;gap:10px;padding:10px 9px 14px;color:#8193a0;border-bottom:2px solid #e1eaed;min-width:0}
+.cw-ob-step>span{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#e5edf1;color:#71899a;font-size:12px;font-weight:800}
+.cw-ob-step strong{font-size:11px;font-weight:700;line-height:1.3}
+.cw-ob-step.active{color:#067f78;border-bottom-color:var(--teal)}.cw-ob-step.active>span{background:var(--teal);color:white}
+.cw-ob-step.done{color:#246d68;border-bottom-color:#98cfc3}.cw-ob-step.done>span{background:#ddf4ea;color:#087a6f}
+.cw-ob-layout{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(260px,.95fr);gap:19px;align-items:start}
+.cw-ob-main{padding:26px 27px}.cw-ob-panel-title{margin-bottom:24px}.cw-ob-panel-title h3{font-size:19px;color:var(--navy);margin-bottom:7px}.cw-ob-panel-title p{font-size:12px;color:var(--muted);margin:0}
+.cw-ob-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 24px}
+.cw-ob-field{display:flex;flex-direction:column;min-width:0;gap:7px;font-size:11px;font-weight:750;color:#314658}
+.cw-ob-field>span{line-height:1.45}.cw-ob-required{color:#d95b61;font-weight:800}
+.cw-ob-field input,.cw-ob-field select,.cw-ob-field textarea{display:block;width:100%;height:42px;padding:10px 12px;border:1px solid #d7e1e8;border-radius:9px;background:#fff;color:#193348;font-size:12px;font-weight:550;outline-offset:2px}
+.cw-ob-field textarea{resize:vertical;min-height:85px;height:auto}.cw-ob-field input:disabled{background:#eff6f5;color:#0a7770}
+.cw-ob-field small{font-size:9px;color:#8696a5;font-weight:450;line-height:1.45}
+.cw-ob-description{margin-top:19px}.cw-ob-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:27px;align-items:center;flex-wrap:wrap}
+.cw-ob-actions .btn{min-height:43px;padding:11px 18px}.cw-ob-actions .btn-primary{display:inline-flex;align-items:center;gap:7px;background:var(--teal);color:#fff}
+.cw-ob-side{display:grid;gap:16px}.cw-ob-info{padding:20px;background:#fff;border:1px solid var(--border);border-radius:12px}
+.cw-ob-info:first-child{background:#f0f8fa;border-color:#dcebf0}.cw-ob-info h3{display:flex;align-items:center;gap:8px;color:#233d50;margin-bottom:14px;font-size:14px}
+.cw-ob-info h3 svg{color:#0a9b91}.cw-ob-info p{margin:0 0 10px;font-size:11px;line-height:1.65;color:#435a6c}.cw-ob-info p:last-child{margin-bottom:0}
+.cw-ob-progress{display:flex;align-items:center;gap:10px;padding:11px 9px;font-size:11px;font-weight:650;color:#5b7382;border-radius:9px}
+.cw-ob-progress>span{display:grid;place-items:center;width:24px;height:24px;border:1px solid #c5d8df;border-radius:50%;color:#7f93a4;font-size:10px;flex:none}
+.cw-ob-progress.active{background:#e1f4ee;color:#08786e}.cw-ob-progress.active>span{background:#0b9087;color:#fff;border-color:#0b9087}
+.cw-ob-access{display:flex;gap:12px;background:#e7f6ed;border-radius:11px;padding:18px;color:#176b4a;font-size:11px}
+.cw-ob-access p{margin:5px 0 0;font-size:11px;color:#316e54}
+.cw-ob-collection-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:23px 0 12px}
+.cw-ob-collection-head h4{margin:0;font-size:13px;color:#263e50}
+.cw-ob-repeat{border:1px solid #e0e9ed;background:#fbfdfd;padding:17px;border-radius:11px;margin-bottom:14px}
+.cw-ob-repeat-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:15px;color:#244353;font-size:12px}
+.cw-ob-hint{font-size:10.5px;color:#67818b;margin:13px 0 0;line-height:1.65}
+.cw-ob-fin-group{border-top:1px solid #e1eaee;padding-top:19px;margin-top:20px}
+.cw-ob-fin-group h4{font-size:13px;margin:0 0 13px;color:#23535b}.cw-ob-fin-group h4 small{margin-left:8px;font-size:10px;color:#8396a0;font-weight:500}
+.cw-ob-fin-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px 16px}
+.cw-ob-fin-grid .cw-ob-field{font-size:10px}.cw-ob-fin-grid input{height:38px;font-size:11px}
+.cw-ob-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-bottom:17px}
+.cw-ob-review{border:1px solid #e2eaed;border-radius:11px;padding:15px;background:#fbfdfd;margin-bottom:13px}
+.cw-ob-review h4{font-size:13px;color:#234a57;margin-bottom:13px}
+.cw-ob-review dl{display:grid;grid-template-columns:1fr 1.2fr;gap:9px;font-size:11px;line-height:1.4;margin:0}
+.cw-ob-review dt{color:#8495a1}.cw-ob-review dd{margin:0;color:#294255;font-weight:700;overflow-wrap:anywhere}
+.cw-ob-note{display:flex;align-items:flex-start;gap:10px;padding:13px 15px;background:#eef7f4;border:1px solid #d8ebe4;color:#3c6965;border-radius:9px;font-size:11px;line-height:1.7}
+.cw-ob-note svg{color:#008b86}.cw-ob-confirm{display:flex;align-items:flex-start;gap:11px;padding:18px 0 3px;color:#4a6370;font-size:11px;line-height:1.6}
+.cw-ob-confirm input{margin-top:3px;accent-color:var(--teal)}
+.cw-ob-done{max-width:840px;padding:38px;text-align:center;margin:auto}.cw-ob-done>svg{color:#089081;background:#e5f6ed;padding:8px;border-radius:50%}
+.cw-ob-done h2{margin:17px 0;color:#173d46}.cw-ob-done p{font-size:12px;color:#586f7d}.cw-ob-done .cw-ob-actions{justify-content:center}
+@media(max-width:1150px){.cw-ob-layout{grid-template-columns:minmax(0,1fr)}.cw-ob-side{grid-template-columns:repeat(3,minmax(0,1fr))}.cw-ob-side>*{min-width:0}}
+@media(max-width:800px){.cw-ob-side{grid-template-columns:1fr}.cw-ob-fin-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.cw-ob-stepper{gap:3px}.cw-ob-step{flex-direction:column;align-items:center;text-align:center;gap:6px}.cw-ob-step strong{font-size:9px}.cw-ob-main{padding:17px 14px}.cw-ob-grid,.cw-ob-review-grid,.cw-ob-fin-grid{grid-template-columns:1fr}.cw-ob-review dl{grid-template-columns:1fr}.cw-ob-repeat{padding:13px}}
