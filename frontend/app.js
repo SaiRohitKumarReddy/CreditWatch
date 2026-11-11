@@ -260,9 +260,17 @@ function onboardPage(d){
     const n=i+1,done=n<s.step&&!onboardStepIssues(n,s,o).length,locked=!!onboardBlockedBy(s,n,o);
     return `<button type="button" data-onboard-jump="${n}" class="cw-ob-step ${n===s.step?'active':''} ${done?'done':''} ${locked?'preview':''}" ${n===s.step?'aria-current="step"':''} ${s.pending?'disabled':''} title="${locked?'View fields — complete earlier stages to edit':'Open '+E(label)}"><span>${done?ico('check',14):n}</span><strong>${E(label)}</strong></button>`;
   }).join('')}</div>`;
- const side=`<aside class="cw-ob-side"><div class="cw-ob-info"><h3>${ico('file',19)} What happens next?</h3><p>1. Complete the borrower, facility and baseline details.</p><p>2. CreditWatch saves the borrower to Google Sheets.</p><p>3. VP/CRO activates and assigns the borrower for monitoring.</p></div><div class="cw-ob-info"><h3>${ico('check',19)} Onboarding Progress</h3>${steps.map((label,i)=>{
-    const n=i+1,done=n<s.step&&!onboardStepIssues(n,s,o).length;
-    return `<button type="button" data-onboard-jump="${n}" class="cw-ob-progress ${n===s.step?'active':''}" ${n===s.step?'aria-current="step"':''} ${s.pending?'disabled':''}><span>${done?'✓':n}</span>${E(label)}${onboardBlockedBy(s,n,o)?'<small>View only</small>':''}</button>`;
+ 
+const side=`<aside class="cw-ob-side">
+  <div class="cw-ob-info">
+    <h3>${ico('check',19)} Onboarding Progress</h3>
+    ${steps.map((label,i)=>{
+      const n=i+1,done=n<s.step&&!onboardStepIssues(n,s,o).length;
+      return `<button type="button" data-onboard-jump="${n}" class="cw-ob-progress ${n===s.step?'active':''}" ${n===s.step?'aria-current="step"':''} ${s.pending?'disabled':''}><span>${done?'✓':n}</span>${E(label)}${onboardBlockedBy(s,n,o)?'<small>View only</small>':''}</button>`;
+    }).join('')}
+  </div>
+</aside>`;
+
   }).join('')}</div><div class="cw-ob-access">${ico('shield',20)} <div><b>Access</b><p>Available to Analyst, AVP and VP/CRO.</p></div></div></aside>`;
  const lockNotice=previewOnly?`<div class="cw-ob-preview-banner" role="status"><div>${ico('shield',18)} <span><strong>Preview only.</strong> Complete <b>${E(steps[blockedBy-1])}</b> to enter data in this stage. You can view the required fields now, but cannot change them.</span></div><button type="button" class="btn btn-outline" data-onboard-jump="${blockedBy}">Go to ${E(steps[blockedBy-1])}</button></div>`:'';
  const validationNotice=s.error?`<div class="cw-ob-error" role="alert">${ico('alert',17)} ${E(s.error)}</div>`:'';
