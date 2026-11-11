@@ -77,8 +77,13 @@ def evaluate(data:dict,bid:str,as_of:str|date|None=None) -> dict:
     asof = date.fromisoformat(as_of) if isinstance(as_of,str) else (as_of or date.fromisoformat(data["metadata"]["generated_as_of"]))
     stamp=asof.isoformat()
     fin=_financials(data,bid)
-    baseline_year=max((y for y in fin if y<=2025),default=None)
-    monitoring_year=max((y for y in fin if y>2025),default=None)
+    # Resolve FYs from their actual data sections, not a hard-coded 2025/2026
+    # cutoff. New sanctions can have a FY2026+ baseline while historic records
+    # retain exactly their existing interpretation.
+    baseline_year=max((int(r["fy"]) for r in data["baseline_financials"]
+                       if r["borrower_id"]==bid and r.get("valid",True)), default=None)
+    monitoring_year=max((int(r["fy"]) for r in data["monitor_financials"]
+                         if r["borrower_id"]==bid and r.get("valid",True)), default=None)
     curr=fin.get(monitoring_year) if monitoring_year else None
     baseline=fin.get(baseline_year) if baseline_year else None
     base_r=compute_ratios(baseline) if baseline else {}

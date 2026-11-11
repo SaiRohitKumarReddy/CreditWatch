@@ -1,6 +1,6 @@
 """CreditWatch server-authoritative workflow, permissions and dashboard payloads.
 
-Standalone demonstration. No borrower onboarding endpoints or operations exist.
+Standalone demonstration with controlled sanctioned-borrower onboarding.
 """
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ from .repository import audit,new_id,utcnow
 ROLES=("Analyst","AVP","VP/CRO")
 # Official role-to-workspace mapping for the frontend; no analyst overview, approval or data tabs.
 ROLE_PAGES={
-    "Analyst":("guide","borrower","ews"),
-    "AVP":("guide","borrower","ews","reviews","data"),
-    "VP/CRO":("guide","overview","borrower","ews","reviews","data"),
+    "Analyst":("onboard","guide","borrower","ews"),
+    "AVP":("onboard","guide","borrower","ews","reviews","data"),
+    "VP/CRO":("onboard","guide","overview","borrower","ews","reviews","data"),
 }
 NAMES={"Analyst":"Monitoring Analyst","AVP":"Monitoring AVP","VP/CRO":"VP/CRO"}
 STATUS_LABELS={"DRAFT":"Draft","PENDING_AVP":"Pending AVP","PENDING_CRO":"Pending VP/CRO",
@@ -35,7 +35,7 @@ def authorized(role):
 
 def _borrower(data,bid):
     record=next((b for b in data["borrowers"] if b["borrower_id"]==bid and b["approval_status"]=="APPROVED"),None)
-    if not record:raise LookupError("Existing approved borrower not found. New registrations are not supported.")
+    if not record:raise LookupError("Approved borrower not found in the borrower master.")
     return record
 
 
@@ -281,7 +281,9 @@ def get_state(data,session):
     try:detail=_borrower_detail(data,bid)
     except LookupError:
         bid=data["borrowers"][0]["borrower_id"];detail=_borrower_detail(data,bid)
+    from .onboarding import onboarding_options
     return {"authenticated":True,"role":role,"actor":NAMES[role],"metadata":data["metadata"],
+            "onboarding":onboarding_options(data,session.get("onboarding_result")),
             "selected_borrower":bid,"overview":overview,"detail":detail,
             "available_pages":list(ROLE_PAGES[role]),
             "permissions":{"edit_baseline":role=="VP/CRO","edit_submissions":role in ("AVP","VP/CRO"),
@@ -358,6 +360,20 @@ def apply_action(data,session,action):
         result=ask_ai(data,bid,str(action.get("question", "")),
             use_groq=bool(action.get("use_groq")),consent=bool(action.get("ai_consent")))
         session["last_ai"]={**result,"borrower_id":bid,"question":str(action.get("question"))}
+        return
+    # CW_ONBOARD_BORROWER_V1: create a master record only. No automatic activation.
+    if kind == "onboard_borrower":
+        from .onboarding import register_borrower
+        new_bid = register_borrower(data, action.get("payload"), NAMES[role])
+        session["selected_borrower"] = new_bid
+        session["onboarding_result"] = {
+            "request_id":str(action.get("request_id") or "")[:100],
+            "borrower_id":new_bid,
+        }
+        session["notice"] = {
+            "type":"success",
+            "text":f"{new_bid} has been added to Existing Borrowers. VP/CRO activation is still required."
+        }
         return
     actor=NAMES[role]
     _borrower(data,bid)
