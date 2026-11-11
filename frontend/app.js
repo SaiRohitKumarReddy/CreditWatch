@@ -271,7 +271,6 @@ const side=`<aside class="cw-ob-side">
   </div>
 </aside>`;
 
-  }).join('')}</div><div class="cw-ob-access">${ico('shield',20)} <div><b>Access</b><p>Available to Analyst, AVP and VP/CRO.</p></div></div></aside>`;
  const lockNotice=previewOnly?`<div class="cw-ob-preview-banner" role="status"><div>${ico('shield',18)} <span><strong>Preview only.</strong> Complete <b>${E(steps[blockedBy-1])}</b> to enter data in this stage. You can view the required fields now, but cannot change them.</span></div><button type="button" class="btn btn-outline" data-onboard-jump="${blockedBy}">Go to ${E(steps[blockedBy-1])}</button></div>`:'';
  const validationNotice=s.error?`<div class="cw-ob-error" role="alert">${ico('alert',17)} ${E(s.error)}</div>`:'';
  return `${sectionHead('SANCTIONED BORROWER MASTER','Onboard Borrower','Add a newly sanctioned borrower to CreditWatch for monitoring.')}${stepper}<div class="cw-ob-layout"><section class="panel cw-ob-main ${previewOnly?'cw-ob-readonly':''}">${lockNotice}${validationNotice}${content}</section>${side}</div>`;
@@ -295,7 +294,6 @@ const ui={
  aiPortfolioQuestion:''
 };
 let currentData=null;
-
 
 function loginPage(d){return `<div class="login">
   <style>
@@ -881,7 +879,7 @@ function guidePage(d){
  <div class="signal-tile"><span class="sig-id">02</span><div class="sig-text"><b>AVP reviews</b><p>Check and correct monitoring submissions; approve and forward to VP/CRO or return for revision.</p></div></div>
  <div class="signal-tile"><span class="sig-id">03</span><div class="sig-text"><b>VP/CRO finalizes</b><p>Review the findings, make permitted amendments, approve the final monitoring report, and oversee ongoing portfolio risk.</p></div></div></div></section></div>
  <section class="panel"><div class="panel-head"><div><div class="eyebrow">WORKSPACE GUIDE</div><h3>What each of your tabs does</h3><p>The list below adapts to the designation used to sign in.</p></div></div><div class="section-grid">${workspaceCards}</div></section>
- <section class="panel"><div class="panel-head"><div><div class="eyebrow">EWS QUICK REFERENCE</div><h3>All ten Early Warning Signals explained</h3><p>What triggers each signal, why it matters after sanction, and the first checks for a monitoring officer.</p></div></div><div class="flag-box">${ico('shield',18)}<div><b>Demonstration screening thresholds</b><p>The examples below describe the current synthetic rule engine. A trigger is an investigation prompt, not proof of default, an RBI SMA/NPA classification, or a contractual breach unless separately verified. Missing data is not a clear signal.</p></div></div><div class="section-grid">${howSignals}</div></section>`;
+ <section class="panel"><div class="panel-head"><div class="eyebrow">EWS QUICK REFERENCE</div><h3>All ten Early Warning Signals explained</h3><p>What triggers each signal, why it matters after sanction, and the first checks for a monitoring officer.</p></div></div><div class="flag-box">${ico('shield',18)}<div><b>Demonstration screening thresholds</b><p>The examples below describe the current synthetic rule engine. A trigger is an investigation prompt, not proof of default, an RBI SMA/NPA classification, or a contractual breach unless separately verified. Missing data is not a clear signal.</p></div></div><div class="section-grid">${howSignals}</div></section>`;
 }
 
 // CW_INVESTIGATION_PRIORITY_FILTER_V1: view-only severity drilldown for AVP and VP/CRO.
@@ -1016,7 +1014,7 @@ function overviewPage(d){
  <div class="metric-grid">
  ${actionKpi('Existing approved borrowers',N(m.borrowers,0),'Corporate and MSME','overview','borrowers','',ui.overviewFocus==='borrowers')}
  ${actionKpi('Pending CRO approval',N(o.counts.PENDING_CRO||0,0),'Monitoring reports','overview','pending','highlight',ui.overviewFocus==='pending')}
- ${actionKpi('Borrowers with active EWS',N(m.triggered_borrowers,0),'Unique borrowers, not signals','overview','triggered','',ui.overviewFocus==='triggered')}
+ ${actionKpi('Borrowers with active EWS',N(m.triggered_borrowers,0),'Unique borrowers, not signals','overview','triggered')}
  ${actionKpi('High / critical watch',N(m.high_critical,0),`${N(m.unassessed,0)} unassessed`,'overview','high','danger',ui.overviewFocus==='high')}
  ${actionKpi('Total funded outstanding',CR(m.total_funded_os_cr),'Across funded facilities','overview','funded','',ui.overviewFocus==='funded')}
  ${actionKpi('High / critical funded O/S',CR(m.high_critical_funded_cr),'Counted once per borrower','overview','highfund','danger',ui.overviewFocus==='highfund')}
@@ -2399,7 +2397,6 @@ function dataPage(d) {
           'Reference',
           'Current value / requirement'
         ],
-
         [
           ...x.covenants.map(c => `
             <tr>
